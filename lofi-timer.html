@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lo-Fi Stopwatch &amp; Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #3b82f6;
+    --accent-soft: #3b82f61a;
+    --radius: 20px;
+    --dur: 260ms;
+  }
+
+  html[data-theme="dark"] {
+    --bg: #0f0f0f;
+    --bg-2: #141414;
+    --text: #f0f0f0;
+    --muted: rgba(240, 240, 240, 0.46);
+    --glass: rgba(255, 255, 255, 0.055);
+    --glass-strong: rgba(255, 255, 255, 0.09);
+    --border: rgba(255, 255, 255, 0.09);
+    --shadow: rgba(0, 0, 0, 0.35);
+    --rain-rgb: 255, 255, 255;
+  }
+
+  html[data-theme="light"] {
+    --bg: #f6f6f5;
+    --bg-2: #ffffff;
+    --text: #2a2a2a;
+    --muted: rgba(42, 42, 42, 0.45);
+    --glass: rgba(255, 255, 255, 0.55);
+    --glass-strong: rgba(255, 255, 255, 0.75);
+    --border: rgba(42, 42, 42, 0.08);
+    --shadow: rgba(30, 30, 30, 0.08);
+    --rain-rgb: 59, 130, 246;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100svh;
+    overflow-x: hidden;
+    transition: background var(--dur) ease, color var(--dur) ease;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #rain-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px 40px;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 5;
+    display: flex;
+    gap: 10px;
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: var(--text);
+    cursor: pointer;
+    transition: transform var(--dur) ease, background var(--dur) ease, opacity var(--dur) ease;
+  }
+
+  .icon-btn:hover { transform: scale(1.05); }
+  .icon-btn:active { transform: scale(0.97); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn.muted { opacity: 0.4; }
+  .icon-btn:focus-visible, .chip:focus-visible, .ctrl-btn:focus-visible, .seg-option:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Segmented mode toggle ---------- */
+  .segmented {
+    position: relative;
+    display: flex;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 999px;
+    padding: 4px;
+    margin-bottom: 36px;
+  }
+
+  .seg-indicator {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    background: var(--accent);
+    border-radius: 999px;
+    transition: transform var(--dur) cubic-bezier(.4,0,.2,1);
+  }
+
+  .seg-option {
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 26px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color var(--dur) ease;
+    letter-spacing: 0.01em;
+  }
+
+  .seg-option.active { color: #fff; }
+  .seg-option:disabled { cursor: not-allowed; }
+
+  /* ---------- Main card ---------- */
+  .card {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border-radius: 28px;
+    box-shadow: 0 20px 60px var(--shadow);
+    padding: clamp(32px, 6vw, 56px) clamp(24px, 8vw, 64px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: min(560px, 92vw);
+    transition: background var(--dur) ease, border-color var(--dur) ease;
+  }
+
+  .display-label {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    height: 18px;
+    margin-bottom: 6px;
+  }
+
+  .time-display {
+    font-variant-numeric: tabular-nums;
+    font-weight: 200;
+    font-size: clamp(52px, 13vw, 92px);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    user-select: none;
+  }
+
+  .time-display .sub {
+    font-size: 0.36em;
+    color: var(--muted);
+    font-weight: 300;
+    margin-left: 4px;
+  }
+
+  .status-msg {
+    height: 22px;
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 500;
+    margin-top: 10px;
+    opacity: 0;
+    transition: opacity var(--dur) ease;
+  }
+  .status-msg.show { opacity: 1; }
+
+  /* ---------- Timer set row ---------- */
+  .set-row {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-top: 22px;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--dur) ease, height var(--dur) ease, margin var(--dur) ease;
+  }
+  .set-row.visible {
+    height: 64px;
+    opacity: 1;
+  }
+
+  .stepper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .stepper button {
+    width: 26px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--dur) ease, transform var(--dur) ease;
+  }
+  .stepper button:hover { color: var(--accent); transform: scale(1.1); }
+  .stepper button svg { width: 12px; height: 12px; }
+
+  .stepper .unit {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+    letter-spacing: 0.03em;
+  }
+
+  .stepper-value {
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--dur) ease, height var(--dur) ease, margin var(--dur) ease;
+  }
+  .chips.visible {
+    height: 32px;
+    opacity: 1;
+    margin-top: 16px;
+  }
+
+  .chip {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform var(--dur) ease, color var(--dur) ease, border-color var(--dur) ease;
+  }
+  .chip:hover { transform: scale(1.05); color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 34px;
+  }
+
+  .ctrl-btn {
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--dur) ease, background var(--dur) ease, opacity var(--dur) ease;
+    font-family: inherit;
+  }
+
+  .ctrl-btn:hover { transform: scale(1.05); }
+  .ctrl-btn:active { transform: scale(0.96); }
+
+  .ctrl-secondary {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--glass-strong);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .ctrl-secondary svg { width: 18px; height: 18px; }
+  .ctrl-secondary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .ctrl-primary {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 10px 30px var(--accent-soft);
+  }
+  .ctrl-primary svg { width: 24px; height: 24px; }
+
+  /* ---------- Laps ---------- */
+  .laps {
+    width: 100%;
+    max-width: 320px;
+    margin-top: 28px;
+    max-height: 160px;
+    overflow-y: auto;
+    display: none;
+  }
+  .laps.visible { display: block; }
+
+  .laps::-webkit-scrollbar { width: 4px; }
+  .laps::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .lap-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 4px;
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .lap-row:last-child { border-bottom: none; }
+  .lap-row .lap-num { color: var(--text); }
+
+  /* ---------- Footer hint ---------- */
+  .hint {
+    margin-top: 26px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+    text-align: center;
+  }
+  .hint kbd {
+    font-family: inherit;
+    background: var(--glass-strong);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 11px;
+  }
+
+  @media (max-width: 420px) {
+    .controls { gap: 14px; }
+    .ctrl-secondary { width: 44px; height: 44px; }
+    .ctrl-primary { width: 62px; height: 62px; }
+    .topbar { top: 14px; right: 14px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="rain-canvas"></canvas>
+
+<audio id="lofi-track" src="Better_Days_-_LAKEY_INSPIRED.mp3" loop preload="auto"></audio>
+
+<div class="topbar">
+  <button class="icon-btn" id="rain-toggle" aria-label="Toggle music and rain ambience" title="Music &amp; rain ambience">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19l-1 2M13 19l-1 2M18 19l-1 2"/><path d="M17 13a5 5 0 10-9.9-1.2A4 4 0 008 19h9a3.5 3.5 0 00-.5-6.9"/></svg>
+  </button>
+  <button class="icon-btn" id="bell-toggle" aria-label="Toggle notification sound" title="Notification sound">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+  </button>
+  <button class="icon-btn" id="theme-toggle" aria-label="Toggle light and dark mode" title="Light / dark mode">
+    <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></svg>
+  </button>
+</div>
+
+<div class="app">
+
+  <div class="segmented" role="tablist" aria-label="Mode">
+    <div class="seg-indicator" id="seg-indicator"></div>
+    <button class="seg-option active" id="mode-stopwatch" role="tab" aria-selected="true">Stopwatch</button>
+    <button class="seg-option" id="mode-timer" role="tab" aria-selected="false">Timer</button>
+  </div>
+
+  <div class="card">
+    <div class="display-label" id="display-label">Elapsed</div>
+
+    <div class="time-display" id="time-display" aria-live="polite">
+      <span id="time-main">00:00</span><span class="sub" id="time-sub">.00</span>
+    </div>
+
+    <div class="status-msg" id="status-msg">Time's up</div>
+
+    <div class="set-row" id="set-row">
+      <div class="stepper" data-unit="min">
+        <button class="step-up" aria-label="Add a minute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <div class="stepper-value" id="min-value">05</div>
+        <div class="unit">min</div>
+        <button class="step-down" aria-label="Subtract a minute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 9l7 7 7-7"/></svg></button>
+      </div>
+      <div style="font-size:28px;color:var(--muted);font-weight:200;">:</div>
+      <div class="stepper" data-unit="sec">
+        <button class="step-up" aria-label="Add ten seconds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <div class="stepper-value" id="sec-value">00</div>
+        <div class="unit">sec</div>
+        <button class="step-down" aria-label="Subtract ten seconds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 9l7 7 7-7"/></svg></button>
+      </div>
+    </div>
+
+    <div class="chips" id="chips">
+      <button class="chip" data-min="1">1 min</button>
+      <button class="chip" data-min="5">5 min</button>
+      <button class="chip" data-min="10">10 min</button>
+      <button class="chip" data-min="25">25 min</button>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn ctrl-secondary" id="reset-btn" aria-label="Reset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+
+      <button class="ctrl-btn ctrl-primary" id="play-btn" aria-label="Start">
+        <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+      </button>
+
+      <button class="ctrl-btn ctrl-secondary" id="lap-btn" aria-label="Lap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v6H4z"/><path d="M4 14h10v6H4z"/></svg>
+      </button>
+    </div>
+
+    <div class="laps" id="laps"></div>
+  </div>
+
+  <div class="hint"><kbd>Space</kbd>&nbsp; start / pause &nbsp;&nbsp; <kbd>R</kbd>&nbsp; reset</div>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ============ Theme ============ */
+  const root = document.documentElement;
+  const themeIcon = document.getElementById('theme-icon');
+  const sunPath = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.3M12 19.2v2.3M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.3M19.2 12h2.3M4.4 19.6L6 18M18 6l1.6-1.6"/>';
+  const moonPath = '<path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 1010.5 10.5z"/>';
+
+  function applyTheme(theme) {
+    root.setAttribute('data-theme', theme);
+    themeIcon.innerHTML = theme === 'dark' ? sunPath : moonPath;
+  }
+
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(prefersDark === false ? 'light' : 'dark');
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+  });
+
+  /* ============ Rain canvas (visual) ============ */
+  const canvas = document.getElementById('rain-canvas');
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let drops = [];
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  function initDrops() {
+    const count = window.innerWidth < 600 ? 34 : 60;
+    drops = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      len: 10 + Math.random() * 18,
+      speed: 2.2 + Math.random() * 2.6,
+      opacity: 0.04 + Math.random() * 0.08
+    }));
+  }
+  resizeCanvas();
+  initDrops();
+  window.addEventListener('resize', () => { resizeCanvas(); initDrops(); });
+
+  function drawFrame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const rgb = getComputedStyle(root).getPropertyValue('--rain-rgb').trim();
+    ctx.lineWidth = 1;
+    drops.forEach(d => {
+      ctx.strokeStyle = `rgba(${rgb}, ${d.opacity})`;
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x, d.y + d.len);
+      ctx.stroke();
+      if (!reduceMotion) {
+        d.y += d.speed;
+        if (d.y > canvas.height) { d.y = -d.len; d.x = Math.random() * canvas.width; }
+      }
+    });
+    if (!reduceMotion) requestAnimationFrame(drawFrame);
+  }
+  drawFrame();
+
+  /* ============ Audio ============ */
+  let audioCtx = null;
+  let rainGain = null;
+  let rainOn = true;
+  let dingOn = true;
+  const RAIN_LEVEL = 0.07; // quiet texture layer now that real music carries the ambience
+
+  const lofiTrack = document.getElementById('lofi-track');
+  lofiTrack.volume = 0.4;
+  let trackStarted = false;
+
+  function startTrack() {
+    if (trackStarted) return;
+    trackStarted = true;
+    if (rainOn) lofiTrack.play().catch(() => {});
+  }
+
+  function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Soft, gentle noise bed — no crackle, no resonance, nothing sharp.
+    const bufferSize = 2 * audioCtx.sampleRate;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    // crossfade the loop edges so the buffer wraps without a click
+    const fadeLen = Math.floor(audioCtx.sampleRate * 0.08); // 80ms fade
+    for (let i = 0; i < fadeLen; i++) {
+      const fade = i / fadeLen;
+      data[i] *= fade;
+      data[bufferSize - 1 - i] *= fade;
+    }
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    noise.loop = true;
+
+    const lowpass = audioCtx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 900;   // soft, dull — no hiss, no edge
+    lowpass.Q.value = 0.1;           // flat rolloff, no resonant peak
+
+    rainGain = audioCtx.createGain();
+    rainGain.gain.value = rainOn ? RAIN_LEVEL : 0;
+
+    // gentle amplitude drift so it breathes instead of sitting flat
+    const lfo = audioCtx.createOscillator();
+    lfo.frequency.value = 0.08;
+    const lfoGain = audioCtx.createGain();
+    lfoGain.gain.value = rainOn ? RAIN_LEVEL * 0.25 : 0;
+    lfo.connect(lfoGain).connect(rainGain.gain);
+    lfo.start();
+
+    noise.connect(lowpass).connect(rainGain).connect(audioCtx.destination);
+    noise.start();
+  }
+
+  function ensureAudioStarted() {
+    if (!audioCtx) initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    startTrack();
+  }
+
+  function playDing() {
+    if (!dingOn) return;
+    ensureAudioStarted();
+    const t = audioCtx.currentTime;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    g.connect(audioCtx.destination);
+    [880, 1318.5].forEach(freq => {
+      const o = audioCtx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      o.connect(g);
+      o.start(t);
+      o.stop(t + 1.3);
+    });
+  }
+
+  ['pointerdown', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, ensureAudioStarted, { once: true, passive: true });
+  });
+
+  const rainToggleBtn = document.getElementById('rain-toggle');
+  const bellToggleBtn = document.getElementById('bell-toggle');
+
+  rainToggleBtn.addEventListener('click', () => {
+    rainOn = !rainOn;
+    rainToggleBtn.classList.toggle('muted', !rainOn);
+    ensureAudioStarted();
+    if (rainGain) rainGain.gain.setTargetAtTime(rainOn ? RAIN_LEVEL : 0, audioCtx.currentTime, 0.25);
+    if (rainOn) lofiTrack.play().catch(() => {});
+    else lofiTrack.pause();
+  });
+
+  bellToggleBtn.addEventListener('click', () => {
+    dingOn = !dingOn;
+    bellToggleBtn.classList.toggle('muted', !dingOn);
+  });
+
+  /* ============ State ============ */
+  let mode = 'stopwatch'; // 'stopwatch' | 'timer'
+  let running = false;
+  let elapsed = 0;         // stopwatch: ms accumulated
+  let rafId = null;
+  let startPerf = 0;
+  let laps = [];
+
+  let timerMinutes = 5;
+  let timerSeconds = 0;
+  let timerDuration = timerMinutes * 60000;
+  let timerRemaining = timerDuration;
+
+  /* ============ Elements ============ */
+  const timeMain = document.getElementById('time-main');
+  const timeSub = document.getElementById('time-sub');
+  const displayLabel = document.getElementById('display-label');
+  const statusMsg = document.getElementById('status-msg');
+  const setRow = document.getElementById('set-row');
+  const chips = document.getElementById('chips');
+  const minValue = document.getElementById('min-value');
+  const secValue = document.getElementById('sec-value');
+  const playBtn = document.getElementById('play-btn');
+  const playIcon = document.getElementById('play-icon');
+  const resetBtn = document.getElementById('reset-btn');
+  const lapBtn = document.getElementById('lap-btn');
+  const lapsEl = document.getElementById('laps');
+  const modeStopwatchBtn = document.getElementById('mode-stopwatch');
+  const modeTimerBtn = document.getElementById('mode-timer');
+  const segIndicator = document.getElementById('seg-indicator');
+
+  const PAUSE_ICON = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+  const PLAY_ICON = '<polygon points="6,4 20,12 6,20"/>';
+
+  function pad(n, len = 2) { return String(Math.floor(n)).padStart(len, '0'); }
+
+  function formatStopwatch(ms) {
+    const totalCs = Math.floor(ms / 10);
+    const cs = totalCs % 100;
+    const totalSec = Math.floor(totalCs / 100);
+    const s = totalSec % 60;
+    const m = Math.floor(totalSec / 60);
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      return { main: `${pad(h)}:${pad(m % 60)}:${pad(s)}`, sub: '' };
+    }
+    return { main: `${pad(m)}:${pad(s)}`, sub: `.${pad(cs)}` };
+  }
+
+  function formatTimer(ms) {
+    const totalSec = Math.max(0, Math.ceil(ms / 1000));
+    const s = totalSec % 60;
+    const m = Math.floor(totalSec / 60) % 60;
+    const h = Math.floor(totalSec / 3600);
+    if (h > 0) return { main: `${pad(h)}:${pad(m)}:${pad(s)}`, sub: '' };
+    return { main: `${pad(m)}:${pad(s)}`, sub: '' };
+  }
+
+  function render() {
+    const { main, sub } = mode === 'stopwatch' ? formatStopwatch(elapsed) : formatTimer(timerRemaining);
+    timeMain.textContent = main;
+    timeSub.textContent = sub;
+  }
+
+  function updateSetRowUI() {
+    minValue.textContent = pad(timerMinutes);
+    secValue.textContent = pad(timerSeconds);
+  }
+
+  function syncModeUI() {
+    const isStopwatch = mode === 'stopwatch';
+    modeStopwatchBtn.classList.toggle('active', isStopwatch);
+    modeTimerBtn.classList.toggle('active', !isStopwatch);
+    modeStopwatchBtn.setAttribute('aria-selected', String(isStopwatch));
+    modeTimerBtn.setAttribute('aria-selected', String(!isStopwatch));
+    segIndicator.style.transform = isStopwatch ? 'translateX(0)' : 'translateX(100%)';
+
+    displayLabel.textContent = isStopwatch ? 'Elapsed' : 'Remaining';
+    lapBtn.style.visibility = isStopwatch ? 'visible' : 'hidden';
+    lapsEl.classList.toggle('visible', isStopwatch && laps.length > 0);
+
+    const showSetRow = !isStopwatch && !running && timerRemaining === timerDuration;
+    setRow.classList.toggle('visible', showSetRow);
+    chips.classList.toggle('visible', showSetRow);
+
+    render();
+  }
+
+  /* ============ Ticking ============ */
+  function tick() {
+    const now = performance.now();
+    if (mode === 'stopwatch') {
+      elapsed = now - startPerf;
+    } else {
+      timerRemaining = Math.max(0, (startPerf) - now);
+      if (timerRemaining <= 0) {
+        finishTimer();
+        return;
+      }
+    }
+    render();
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function finishTimer() {
+    running = false;
+    timerRemaining = 0;
+    render();
+    playIcon.innerHTML = PLAY_ICON;
+    playDing();
+    statusMsg.classList.add('show');
+    if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+    setTimeout(() => statusMsg.classList.remove('show'), 3000);
+    setModeButtonsDisabled(false);
+  }
+
+  function setModeButtonsDisabled(disabled) {
+    modeStopwatchBtn.disabled = disabled;
+    modeTimerBtn.disabled = disabled;
+  }
+
+  function start() {
+    if (running) return;
+    ensureAudioStarted();
+    statusMsg.classList.remove('show');
+    running = true;
+    setModeButtonsDisabled(true);
+    if (mode === 'stopwatch') {
+      startPerf = performance.now() - elapsed;
+    } else {
+      if (timerRemaining <= 0) timerRemaining = timerDuration;
+      startPerf = performance.now() + timerRemaining;
+    }
+    playIcon.innerHTML = PAUSE_ICON;
+    setRow.classList.remove('visible');
+    chips.classList.remove('visible');
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pause() {
+    if (!running) return;
+    running = false;
+    cancelAnimationFrame(rafId);
+    playIcon.innerHTML = PLAY_ICON;
+    setModeButtonsDisabled(false);
+  }
+
+  function reset() {
+    running = false;
+    cancelAnimationFrame(rafId);
+    playIcon.innerHTML = PLAY_ICON;
+    statusMsg.classList.remove('show');
+    setModeButtonsDisabled(false);
+    if (mode === 'stopwatch') {
+      elapsed = 0;
+      laps = [];
+      renderLaps();
+    } else {
+      timerDuration = timerMinutes * 60000 + timerSeconds * 1000;
+      timerRemaining = timerDuration;
+    }
+    syncModeUI();
+  }
+
+  function toggleStartPause() {
+    if (mode === 'timer' && timerDuration === 0 && !running) return;
+    running ? pause() : start();
+  }
+
+  /* ============ Laps ============ */
+  function renderLaps() {
+    lapsEl.innerHTML = '';
+    laps.forEach((lap, i) => {
+      const row = document.createElement('div');
+      row.className = 'lap-row';
+      const { main, sub } = formatStopwatch(lap);
+      row.innerHTML = `<span class="lap-num">Lap ${i + 1}</span><span>${main}${sub}</span>`;
+      lapsEl.prepend(row);
+    });
+    lapsEl.classList.toggle('visible', mode === 'stopwatch' && laps.length > 0);
+  }
+
+  lapBtn.addEventListener('click', () => {
+    if (mode !== 'stopwatch' || !running) return;
+    laps.push(elapsed);
+    renderLaps();
+  });
+
+  /* ============ Controls ============ */
+  playBtn.addEventListener('click', toggleStartPause);
+  resetBtn.addEventListener('click', reset);
+
+  modeStopwatchBtn.addEventListener('click', () => {
+    if (running || mode === 'stopwatch') return;
+    mode = 'stopwatch';
+    syncModeUI();
+  });
+  modeTimerBtn.addEventListener('click', () => {
+    if (running || mode === 'timer') return;
+    mode = 'timer';
+    syncModeUI();
+  });
+
+  /* ============ Timer set controls ============ */
+  function clampTimer() {
+    if (timerMinutes <= 0 && timerSeconds <= 0) { timerMinutes = 0; timerSeconds = 5; }
+    timerMinutes = Math.min(99, Math.max(0, timerMinutes));
+    timerSeconds = Math.min(59, Math.max(0, timerSeconds));
+    timerDuration = timerMinutes * 60000 + timerSeconds * 1000;
+    timerRemaining = timerDuration;
+    updateSetRowUI();
+    render();
+  }
+
+  setRow.querySelectorAll('.stepper').forEach(stepper => {
+    const unit = stepper.dataset.unit;
+    stepper.querySelector('.step-up').addEventListener('click', () => {
+      if (unit === 'min') timerMinutes++; else timerSeconds = (timerSeconds + 5) % 60;
+      clampTimer();
+    });
+    stepper.querySelector('.step-down').addEventListener('click', () => {
+      if (unit === 'min') timerMinutes = Math.max(0, timerMinutes - 1);
+      else timerSeconds = timerSeconds - 5 < 0 ? 55 : timerSeconds - 5;
+      clampTimer();
+    });
+  });
+
+  chips.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      timerMinutes = parseInt(chip.dataset.min, 10);
+      timerSeconds = 0;
+      clampTimer();
+    });
+  });
+
+  /* ============ Keyboard shortcuts ============ */
+  window.addEventListener('keydown', (e) => {
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      toggleStartPause();
+    } else if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      reset();
+    }
+  });
+
+  /* ============ Init ============ */
+  clampTimer();
+  syncModeUI();
+})();
+</script>
+
+</body>
+</html>
