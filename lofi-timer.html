@@ -6,7 +6,7 @@
 <title>Lo-Fi Stopwatch &amp; Timer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
     --accent: #3b82f6;
@@ -95,16 +95,27 @@
     justify-content: center;
     background: var(--glass);
     border: 1px solid var(--border);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: url(#liquid-glass) blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 3px rgba(0,0,0,0.12), 0 6px 16px var(--shadow);
     color: var(--text);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
     transition: transform var(--dur) ease, background var(--dur) ease, opacity var(--dur) ease;
+  }
+  .icon-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 40%);
+    mix-blend-mode: overlay;
+    pointer-events: none;
   }
 
   .icon-btn:hover { transform: scale(1.05); }
   .icon-btn:active { transform: scale(0.97); }
-  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn svg { width: 17px; height: 17px; position: relative; z-index: 1; }
   .icon-btn.muted { opacity: 0.4; }
   .icon-btn:focus-visible, .chip:focus-visible, .ctrl-btn:focus-visible, .seg-option:focus-visible {
     outline: 2px solid var(--accent);
@@ -117,11 +128,21 @@
     display: flex;
     background: var(--glass);
     border: 1px solid var(--border);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: url(#liquid-glass) blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.1), 0 8px 20px var(--shadow);
     border-radius: 999px;
     padding: 4px;
     margin-bottom: 36px;
+  }
+  .segmented::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: linear-gradient(120deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 45%);
+    mix-blend-mode: overlay;
+    pointer-events: none;
   }
 
   .seg-indicator {
@@ -158,17 +179,28 @@
   .card {
     background: var(--glass);
     border: 1px solid var(--border);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
+    backdrop-filter: url(#liquid-glass) blur(24px) saturate(170%);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
     border-radius: 28px;
-    box-shadow: 0 20px 60px var(--shadow);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 3px rgba(0,0,0,0.1), 0 20px 60px var(--shadow);
     padding: clamp(32px, 6vw, 56px) clamp(24px, 8vw, 64px);
     display: flex;
     flex-direction: column;
     align-items: center;
     width: min(560px, 92vw);
+    position: relative;
+    overflow: hidden;
     transition: background var(--dur) ease, border-color var(--dur) ease;
   }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.08) 100%);
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+  .card > * { position: relative; z-index: 1; }
 
   .display-label {
     font-size: 13px;
@@ -181,20 +213,39 @@
 
   .time-display {
     font-variant-numeric: tabular-nums;
-    font-weight: 200;
-    font-size: clamp(52px, 13vw, 92px);
-    letter-spacing: -0.02em;
+    font-weight: 900;
+    font-size: clamp(58px, 15vw, 104px);
+    letter-spacing: -0.045em;
     line-height: 1;
     display: flex;
     align-items: baseline;
     gap: 2px;
     user-select: none;
+    background:
+      radial-gradient(130% 70% at 28% -10%, rgba(255,255,255,0.55), transparent 55%),
+      linear-gradient(180deg, #6b6b6b 0%, #2c2c2c 45%, #0a0a0a 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 10px 18px var(--shadow));
+  }
+
+  html[data-theme="light"] .time-display {
+    background:
+      radial-gradient(130% 70% at 28% -10%, rgba(255,255,255,0.8), transparent 55%),
+      linear-gradient(180deg, #4a4a4a 0%, #232323 50%, #050505 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
   }
 
   .time-display .sub {
     font-size: 0.36em;
-    color: var(--muted);
-    font-weight: 300;
+    font-weight: 600;
+    background: inherit;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    opacity: 0.65;
     margin-left: 4px;
   }
 
@@ -281,7 +332,9 @@
 
   .chip {
     border: 1px solid var(--border);
-    background: transparent;
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     color: var(--muted);
     font-family: inherit;
     font-size: 12.5px;
@@ -319,9 +372,22 @@
     border-radius: 50%;
     background: var(--glass-strong);
     border: 1px solid var(--border);
+    backdrop-filter: url(#liquid-glass) blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 2px rgba(0,0,0,0.12);
     color: var(--text);
+    position: relative;
+    overflow: hidden;
   }
-  .ctrl-secondary svg { width: 18px; height: 18px; }
+  .ctrl-secondary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 45%);
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+  .ctrl-secondary svg { width: 18px; height: 18px; position: relative; z-index: 1; }
   .ctrl-secondary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
 
   .ctrl-primary {
@@ -330,9 +396,18 @@
     border-radius: 50%;
     background: var(--accent);
     color: #fff;
-    box-shadow: 0 10px 30px var(--accent-soft);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 10px 30px var(--accent-soft);
+    position: relative;
+    overflow: hidden;
   }
-  .ctrl-primary svg { width: 24px; height: 24px; }
+  .ctrl-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 50%);
+    pointer-events: none;
+  }
+  .ctrl-primary svg { width: 24px; height: 24px; position: relative; z-index: 1; }
 
   /* ---------- Laps ---------- */
   .laps {
@@ -390,6 +465,14 @@
 </style>
 </head>
 <body>
+
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <filter id="liquid-glass" x="-30%" y="-30%" width="160%" height="160%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.009 0.012" numOctaves="2" seed="7" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="3" result="soft"/>
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="16" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
 
 <canvas id="rain-canvas"></canvas>
 
@@ -560,12 +643,13 @@
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    // crossfade the loop edges so the buffer wraps without a click
-    const fadeLen = Math.floor(audioCtx.sampleRate * 0.08); // 80ms fade
+    // seamless loop: blend the tail into the head instead of fading either to
+    // silence (fading both edges to 0 created an audible dip every loop)
+    const fadeLen = Math.floor(audioCtx.sampleRate * 0.08); // 80ms blend
     for (let i = 0; i < fadeLen; i++) {
-      const fade = i / fadeLen;
-      data[i] *= fade;
-      data[bufferSize - 1 - i] *= fade;
+      const mix = i / fadeLen;
+      const tailIdx = bufferSize - fadeLen + i;
+      data[tailIdx] = data[tailIdx] * (1 - mix) + data[i] * mix;
     }
 
     const noise = audioCtx.createBufferSource();
